@@ -15,11 +15,23 @@ import os
 import streamlit as st
 import pandas as pd
 
-# Localizador dinâmico do CSV (funciona rodando da raiz ou de dentro da pasta aulas/)
+import toml
+
+# Localizador dinâmico do CSV e secrets (funciona rodando da raiz ou de dentro da pasta aulas/)
 DIRETORIO_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAMINHO_CSV = os.path.join(DIRETORIO_PROJETO, "dados_b3_reais.csv")
 if not os.path.exists(CAMINHO_CSV):
     CAMINHO_CSV = "dados_b3_reais.csv"
+
+# Carrega credenciais do .streamlit/secrets.toml da raiz se não estiver no contexto local
+caminho_secrets = os.path.join(DIRETORIO_PROJETO, ".streamlit", "secrets.toml")
+db_kwargs = {}
+if os.path.exists(caminho_secrets):
+    try:
+        sec = toml.load(caminho_secrets)
+        db_kwargs = sec.get("connections", {}).get("postgresql", {})
+    except Exception:
+        pass
 
 st.set_page_config(page_title="Aula 01 - Conexão e Segurança", page_icon="🔒", layout="wide")
 
@@ -31,8 +43,11 @@ st.markdown("Demonstração da conexão com o banco relacional na nuvem e resili
 # ------------------------------------------------------------------------------
 origem = "Supabase (PostgreSQL Cloud)"
 try:
-    # Obtém conexão usando as credenciais do .streamlit/secrets.toml
-    conn = st.connection("postgresql", type="sql")
+    # Obtém conexão usando as credenciais do secrets.toml (com kwargs resilientes)
+    if db_kwargs:
+        conn = st.connection("postgresql", type="sql", **db_kwargs)
+    else:
+        conn = st.connection("postgresql", type="sql")
     
     # Teste de conexão simples
     df_teste = conn.query("SELECT DISTINCT ticker FROM acoes_b3 ORDER BY ticker ASC;", ttl=0)
