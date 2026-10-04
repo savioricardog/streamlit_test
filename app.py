@@ -63,37 +63,43 @@ st.markdown("""
 
 
 # ==============================================================================
-# AULA 1 & 2: CONEXÃO COM BANCO DE DADOS, FALLBACK E CACHE AVANÇADO
+# AULA 1 & 2: CONEXÃO COM BANCO DE DADOS, FALLBACK E CACHE INTELIGENTE
 # ==============================================================================
 @st.cache_data(ttl=600, show_spinner="Consultando dados de mercado no Supabase...")
-def carregar_dados():
+def _consultar_supabase():
     """
-    Executa a consulta na tabela 'acoes_b3' no PostgreSQL/Supabase.
-    Caso a conexão remota falhe, aciona automaticamente o fallback para CSV local
-    e captura o motivo exato do erro para diagnóstico.
+    Executa a query diretamente no Supabase.
+    Se a conexão for bem-sucedida, o resultado é cacheado por 10 minutos.
+    Se houver erro, a exceção é disparada e o Streamlit NÃO armazena o erro em cache!
     """
-    origem = "Supabase (PostgreSQL Cloud)"
-    erro_msg = None
-    try:
-        conn = st.connection("postgresql", type="sql")
-        query = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 ORDER BY data ASC;"
-        df = conn.query(query, ttl=600)
-        
-        if df is None or df.empty:
-            raise ValueError("A consulta ao banco retornou vazia.")
-            
-    except Exception as erro:
-        origem = "Fallback Local (dados_b3_reais.csv)"
-        erro_msg = str(erro)
-        df = pd.read_csv("dados_b3_reais.csv")
+    conn = st.connection("postgresql", type="sql")
+    query = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 ORDER BY data ASC;"
+    df = conn.query(query, ttl=600)
     
-    # Tratamentos básicos de dados
+    if df is None or df.empty:
+        raise ValueError("A consulta ao banco Supabase retornou vazia.")
+        
     df["data"] = pd.to_datetime(df["data"]).dt.date
     df["preco_fechamento"] = pd.to_numeric(df["preco_fechamento"], errors="coerce")
     df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
     df = df.dropna(subset=["preco_fechamento", "data"]).sort_values(by=["ticker", "data"]).reset_index(drop=True)
-    
-    return df, origem, erro_msg
+    return df
+
+def carregar_dados():
+    """
+    Coordena a carga com resiliência: tenta o Supabase e, em caso de falha,
+    aciona imediatamente o Fallback local sem contaminar a memória de cache.
+    """
+    try:
+        df = _consultar_supabase()
+        return df, "Supabase (PostgreSQL Cloud)", None
+    except Exception as erro:
+        df_local = pd.read_csv("dados_b3_reais.csv")
+        df_local["data"] = pd.to_datetime(df_local["data"]).dt.date
+        df_local["preco_fechamento"] = pd.to_numeric(df_local["preco_fechamento"], errors="coerce")
+        df_local["volume"] = pd.to_numeric(df_local["volume"], errors="coerce")
+        df_local = df_local.dropna(subset=["preco_fechamento", "data"]).sort_values(by=["ticker", "data"]).reset_index(drop=True)
+        return df_local, "Fallback Local (dados_b3_reais.csv)", str(erro)
 
 
 # Carga dos dados com cache ativo
