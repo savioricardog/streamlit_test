@@ -475,9 +475,9 @@ with tab_teoria:
 
     with col_p2:
         sql_exemplo = f"""-- Sintaxe exata ensinada no Slide 15:
-conn = st.connection("postgresql", type="sql")
-query = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 WHERE ticker = :ticker ORDER BY data DESC LIMIT :limite;"
-df = conn.query(query, params={{"ticker": "{ticker_param}", "limite": {limite_linhas}}})"""
+                        conn = st.connection("postgresql", type="sql")
+                        query = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 WHERE ticker = :ticker ORDER BY data DESC LIMIT :limite;"
+                        df = conn.query(query, params={{"ticker": "{ticker_param}", "limite": {limite_linhas}}})"""
         st.code(sql_exemplo, language="python")
 
     if executar_query:
