@@ -9,7 +9,6 @@ CSV_PATH = "dados_b3_reais.csv"
 def carregar_dados_no_supabase():
     if not os.path.exists(SECRETS_PATH):
         print(f"[ERRO] Arquivo de segredos '{SECRETS_PATH}' não encontrado.")
-        print("Copie '.streamlit/secrets.toml.example' para '.streamlit/secrets.toml' e configure suas credenciais.")
         return
 
     secrets = toml.load(SECRETS_PATH)
@@ -29,10 +28,10 @@ def carregar_dados_no_supabase():
         port = db_config.get("port")
         dbname = db_config.get("database")
         
-        # Conexão com driver psycopg2 explícito
-        connection_url = f"postgresql+psycopg2://{user}:{pwd}@{host}:{port}/{dbname}"
+        # Conexão com driver psycopg2
+        connection_url = f"postgresql+psycopg://{user}:{pwd}@{host}:{port}/{dbname}"
 
-    host_display = db_config.get("host") or db_config.get("SUPABASE_HOST") or "URI"
+    host_display = db_config.get("host")
     print(f"-> Conectando ao Supabase em: {host_display} (Porta: {port})...")
     engine = create_engine(connection_url)
 
