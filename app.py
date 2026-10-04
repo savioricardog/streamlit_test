@@ -2,13 +2,18 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import os
 from datetime import datetime, date, timedelta
 
 # Configuração de segurança para exibição de dados
 pd.set_option("styler.render.max_elements", 1_000_000)
 
+# Resolução dinâmica do caminho raiz do projeto para resiliência máxima
+DIRETORIO_RAIZ = os.path.dirname(os.path.abspath(__file__))
+CAMINHO_CSV = os.path.join(DIRETORIO_RAIZ, "dados_b3_reais.csv")
+
 # ==============================================================================
-# CONFIGURAÇÃO DA PÁGINA
+# CONFIGURAÇÃO DA PÁGINA & IDENTIDADE VISUAL
 # ==============================================================================
 st.set_page_config(
     page_title="Dashboard Financeiro B3 | Análise Avançada",
@@ -63,8 +68,14 @@ st.markdown("""
 
 
 # ==============================================================================
-# AULA 1 & 2: CONEXÃO COM BANCO DE DADOS, FALLBACK E CACHE INTELIGENTE
+# 🔒 [AULA 01] CONEXÃO COM BANCO DE DADOS, SEGURANÇA (SECRETS) E FALLBACK
 # ==============================================================================
+# Conceitos da Aula 1:
+# 1. Conexão com banco relacional na nuvem (PostgreSQL / Supabase) via st.connection
+# 2. Segurança de credenciais: .streamlit/secrets.toml protegido pelo .gitignore
+# 3. Resiliência de dados: fallback automático para CSV local caso a rede falhe
+# ==============================================================================
+
 @st.cache_data(ttl=600, show_spinner="Consultando dados de mercado no Supabase...")
 def _consultar_supabase():
     """
@@ -94,7 +105,7 @@ def carregar_dados():
         df = _consultar_supabase()
         return df, "Supabase (PostgreSQL Cloud)", None
     except Exception as erro:
-        df_local = pd.read_csv("dados_b3_reais.csv")
+        df_local = pd.read_csv(CAMINHO_CSV)
         df_local["data"] = pd.to_datetime(df_local["data"]).dt.date
         df_local["preco_fechamento"] = pd.to_numeric(df_local["preco_fechamento"], errors="coerce")
         df_local["volume"] = pd.to_numeric(df_local["volume"], errors="coerce")
@@ -102,26 +113,44 @@ def carregar_dados():
         return df_local, "Fallback Local (dados_b3_reais.csv)", str(erro)
 
 
-# Carga dos dados com cache ativo
+# Carga dos dados (resiliente e com cache ativo)
 df_bruto, origem_dados, erro_conexao = carregar_dados()
 
-# Lista de todos os tickers disponíveis
+# Metadados e variáveis de controle inicial
 todos_tickers = sorted(df_bruto["ticker"].unique().tolist())
 data_minima = df_bruto["data"].min()
 data_maxima = df_bruto["data"].max()
 
-# Seleção inicial inteligente: 4 blue chips conhecidas para evitar "gráfico espaguete"
+# Seleção inicial inteligente: 4 blue chips conhecidas para evitar sobrecarga visual
 tickers_padrao_sugeridos = [t for t in ["PETR4", "VALE3", "ITUB4", "WEGE3"] if t in todos_tickers]
 if not tickers_padrao_sugeridos:
     tickers_padrao_sugeridos = todos_tickers[:4]
 
-# Data inicial padrão: últimos 3 anos (para evitar distorções de moedas antigas/lotes de mil dos anos 2000)
+# Data inicial padrão: últimos 3 anos para foco no cenário recente de mercado
 data_inicio_padrao = max(data_minima, data_maxima - timedelta(days=365 * 3))
 
 
 # ==============================================================================
-# AULA 2: PERSISTÊNCIA DE ESTADO (st.session_state) & CALLBACKS
+# ⚡ [AULA 02] PERFORMANCE (CACHE), ESTADO (SESSION_STATE) & FILTROS CRUZADOS
 # ==============================================================================
+# Conceitos da Aula 2:
+# 1. Comparativo @st.cache_data (dados e tabelas) vs @st.cache_resource (conexões)
+# 2. Gerenciamento de estado (st.session_state) para manter filtros e callback de reset
+# 3. Construção de filtros reativos cruzados na barra lateral (st.sidebar)
+# ==============================================================================
+
+@st.cache_resource
+def obter_conexao_persistente():
+    """
+    Demonstração prática de @st.cache_resource (Slide 22):
+    Retorna a instância compartilhada do gerenciador de conexão sem recriá-la na memória.
+    """
+    try:
+        return st.connection("postgresql", type="sql")
+    except Exception:
+        return None
+
+# Inicialização segura do estado da sessão (Session State)
 if "filtro_tickers" not in st.session_state:
     st.session_state.filtro_tickers = tickers_padrao_sugeridos
 
@@ -129,14 +158,14 @@ if "filtro_periodo" not in st.session_state:
     st.session_state.filtro_periodo = (data_inicio_padrao, data_maxima)
 
 def resetar_filtros():
-    """Callback para resetar filtros para o estado ideal de visualização"""
+    """Callback disparado pelo botão para restaurar os filtros ao estado padrão limpo"""
     st.session_state.filtro_tickers = tickers_padrao_sugeridos
     st.session_state.filtro_periodo = (data_inicio_padrao, data_maxima)
 
 
-# ==============================================================================
-# BARRA LATERAL: FILTROS REATIVOS CRUZADOS
-# ==============================================================================
+# ------------------------------------------------------------------------------
+# BARRA LATERAL: FILTROS REATIVOS CRUZADOS (st.sidebar)
+# ------------------------------------------------------------------------------
 with st.sidebar:
     st.title("⚙️ Filtros do Mercado")
     
@@ -223,8 +252,16 @@ if df_filtrado.empty:
 
 
 # ==============================================================================
-# CABEÇALHO E CARTÕES DE KPI
+# 📊 [AULA 03] ENGENHARIA VISUAL (KPIS, PLOTLY) & ESTRUTURA PARA DEPLOY CLOUD
 # ==============================================================================
+# Conceitos da Aula 3:
+# 1. Indicadores de Performance (KPIs) com st.columns e st.metric
+# 2. Visualização analítica rica com Plotly Express (Linhas, Base 100, Barras de Volume)
+# 3. Organização do Dashboard em Abas (st.tabs) e exportação de dados (st.download_button)
+# 4. Estrutura profissional de versionamento e Deploy no Streamlit Community Cloud
+# ==============================================================================
+
+# Cabeçalho da Aplicação e Resumo do Filtro Ativo
 st.title("📈 Performance de Ações B3")
 st.markdown(
     f"Exibindo **{len(tickers_selecionados)} ativo(s)** ({', '.join(tickers_selecionados)}) "
@@ -406,22 +443,8 @@ with tab_tabela:
 
 
 # ==============================================================================
-# 📗 AULA 2: EXEMPLO PRÁTICO DE @st.cache_resource (Slide 22)
+# 🎓 ABA 3: LABORATÓRIO PEDAGÓGICO & EXERCÍCIOS PRÁTICOS (SEMANA 11)
 # ==============================================================================
-# Enquanto o @st.cache_data armazena CÓPIAS de dados (DataFrames, listas),
-# o @st.cache_resource mantém a MESMA INSTÂNCIA viva de conexões ou modelos pesados
-# compartilhada entre todas as sessões e usuários conectados na aplicação.
-# ==============================================================================
-@st.cache_resource
-def obter_conexao_persistente():
-    """
-    Demonstração prática do Slide 22:
-    Retorna a instância do gerenciador de conexão sem recriá-la na memória.
-    """
-    try:
-        return st.connection("postgresql", type="sql")
-    except Exception:
-        return None
 
 
 with tab_teoria:
