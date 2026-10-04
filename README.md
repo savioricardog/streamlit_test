@@ -58,11 +58,11 @@ python load_supabase.py
 ```toml
 [connections.postgresql]
 dialect = "postgresql"
-host = "aws-0-sa-east-1.pooler.supabase.com"
+host = "aws-0-us-east-2.pooler.supabase.com"
 port = 6543
 database = "postgres"
-username = "postgres.seu_project_ref"
-password = "sua_senha_do_supabase"
+username = "postgres.adtvjcplizwuellgzuyr"
+password = "postgres_local_pbi"
 ```
 
 > **Nota de Resiliência:** Caso você não configure o `secrets.toml` ou fique sem internet, o aplicativo continuará funcionando normalmente através do **mecanismo de fallback** para o arquivo `dados_b3_reais.csv`!

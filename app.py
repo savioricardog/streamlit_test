@@ -69,9 +69,11 @@ st.markdown("""
 def carregar_dados():
     """
     Executa a consulta na tabela 'acoes_b3' no PostgreSQL/Supabase.
-    Caso a conexão remota falhe, aciona automaticamente o fallback para CSV local.
+    Caso a conexão remota falhe, aciona automaticamente o fallback para CSV local
+    e captura o motivo exato do erro para diagnóstico.
     """
     origem = "Supabase (PostgreSQL Cloud)"
+    erro_msg = None
     try:
         conn = st.connection("postgresql", type="sql")
         query = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 ORDER BY data ASC;"
@@ -82,6 +84,7 @@ def carregar_dados():
             
     except Exception as erro:
         origem = "Fallback Local (dados_b3_reais.csv)"
+        erro_msg = str(erro)
         df = pd.read_csv("dados_b3_reais.csv")
     
     # Tratamentos básicos de dados
@@ -90,11 +93,11 @@ def carregar_dados():
     df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
     df = df.dropna(subset=["preco_fechamento", "data"]).sort_values(by=["ticker", "data"]).reset_index(drop=True)
     
-    return df, origem
+    return df, origem, erro_msg
 
 
 # Carga dos dados com cache ativo
-df_bruto, origem_dados = carregar_dados()
+df_bruto, origem_dados, erro_conexao = carregar_dados()
 
 # Lista de todos os tickers disponíveis
 todos_tickers = sorted(df_bruto["ticker"].unique().tolist())
@@ -134,9 +137,14 @@ with st.sidebar:
     # Status da conexão
     if "Supabase" in origem_dados:
         st.markdown(f'<span class="badge-cloud">🟢 {origem_dados}</span>', unsafe_allow_html=True)
+        st.caption("Conectado ao vivo com o banco PostgreSQL no Supabase.")
     else:
         st.markdown(f'<span class="badge-fallback">🟡 {origem_dados}</span>', unsafe_allow_html=True)
-        st.caption("Conectado localmente. Configure o secrets.toml para habilitar a nuvem.")
+        if erro_conexao:
+            with st.expander("🔍 Motivo do Fallback (Diagnóstico):", expanded=True):
+                st.caption("Erro retornado ao tentar conectar no Supabase:")
+                st.code(erro_conexao, language="bash")
+        st.caption("Configure as credenciais no secrets.toml ou no painel da nuvem.")
 
     st.markdown("---")
     
