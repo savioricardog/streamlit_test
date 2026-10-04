@@ -14,7 +14,14 @@ Conceitos trabalhados nesta aula:
 
 import streamlit as st
 import pandas as pd
+import os
 from datetime import timedelta
+
+# Localizador dinâmico do CSV (funciona rodando da raiz ou de dentro da pasta aulas/)
+DIRETORIO_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CAMINHO_CSV = os.path.join(DIRETORIO_PROJETO, "dados_b3_reais.csv")
+if not os.path.exists(CAMINHO_CSV):
+    CAMINHO_CSV = "dados_b3_reais.csv"
 
 st.set_page_config(page_title="Aula 02 - Cache e Estado", page_icon="⚡", layout="wide")
 
@@ -35,7 +42,7 @@ def carregar_dados_com_cache():
         conn = obter_conexao()
         df = conn.query("SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 ORDER BY data ASC;")
     except Exception:
-        df = pd.read_csv("dados_b3_reais.csv")
+        df = pd.read_csv(CAMINHO_CSV)
     
     df["data"] = pd.to_datetime(df["data"]).dt.date
     df["preco_fechamento"] = pd.to_numeric(df["preco_fechamento"], errors="coerce")

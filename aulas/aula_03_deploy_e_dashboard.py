@@ -12,9 +12,16 @@ Conceitos trabalhados nesta aula:
 """
 
 import streamlit as st
+import os
 import pandas as pd
 import plotly.express as px
 from datetime import timedelta, date
+
+# Localizador dinâmico do CSV (funciona rodando da raiz ou de dentro da pasta aulas/)
+DIRETORIO_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CAMINHO_CSV = os.path.join(DIRETORIO_PROJETO, "dados_b3_reais.csv")
+if not os.path.exists(CAMINHO_CSV):
+    CAMINHO_CSV = "dados_b3_reais.csv"
 
 st.set_page_config(page_title="Aula 03 - Dashboard Final", page_icon="📈", layout="wide")
 
@@ -27,7 +34,7 @@ def carregar_dados():
         conn = st.connection("postgresql", type="sql")
         df = conn.query("SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 ORDER BY data ASC;")
     except Exception:
-        df = pd.read_csv("dados_b3_reais.csv")
+        df = pd.read_csv(CAMINHO_CSV)
     
     df["data"] = pd.to_datetime(df["data"]).dt.date
     df["preco_fechamento"] = pd.to_numeric(df["preco_fechamento"], errors="coerce")

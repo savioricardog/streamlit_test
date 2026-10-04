@@ -11,8 +11,15 @@ Conceitos trabalhados nesta aula:
 ==============================================================================
 """
 
+import os
 import streamlit as st
 import pandas as pd
+
+# Localizador dinâmico do CSV (funciona rodando da raiz ou de dentro da pasta aulas/)
+DIRETORIO_PROJETO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CAMINHO_CSV = os.path.join(DIRETORIO_PROJETO, "dados_b3_reais.csv")
+if not os.path.exists(CAMINHO_CSV):
+    CAMINHO_CSV = "dados_b3_reais.csv"
 
 st.set_page_config(page_title="Aula 01 - Conexão e Segurança", page_icon="🔒", layout="wide")
 
@@ -34,7 +41,7 @@ try:
 except Exception as erro:
     origem = "Fallback Local (dados_b3_reais.csv)"
     st.warning(f"🟡 Falha na conexão com o banco. Carregando contingência em CSV... Detalhe: {erro}")
-    df_local = pd.read_csv("dados_b3_reais.csv")
+    df_local = pd.read_csv(CAMINHO_CSV)
     lista_tickers = sorted(df_local["ticker"].unique().tolist())
 
 # ------------------------------------------------------------------------------
