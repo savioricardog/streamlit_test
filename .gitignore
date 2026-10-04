@@ -1,0 +1,19 @@
+# Ambientes Virtuais Python
+.venv/
+venv/
+ENV/
+.streamlit_t2_avancado/
+
+# Arquivos de Cache e Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.ipynb_checkpoints
+
+# Segurança - NUNCA subir credenciais para o repositório!
+.streamlit/secrets.toml
+
+# Logs e arquivos de sistema
+*.log
+.DS_Store
+Thumbs.db
