@@ -43,7 +43,7 @@ Você pode criar a tabela de duas maneiras simples:
 ### 3. (Opcional) Subir via Script Python
 Se preferir automatizar a carga via Python:
 ```bash
-python migrar_para_supabase.py
+python load_supabase.py
 ```
 
 ---
