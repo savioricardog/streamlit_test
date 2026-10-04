@@ -405,20 +405,126 @@ with tab_tabela:
     )
 
 
+# ==============================================================================
+# 📗 AULA 2: EXEMPLO PRÁTICO DE @st.cache_resource (Slide 22)
+# ==============================================================================
+# Enquanto o @st.cache_data armazena CÓPIAS de dados (DataFrames, listas),
+# o @st.cache_resource mantém a MESMA INSTÂNCIA viva de conexões ou modelos pesados
+# compartilhada entre todas as sessões e usuários conectados na aplicação.
+# ==============================================================================
+@st.cache_resource
+def obter_conexao_persistente():
+    """
+    Demonstração prática do Slide 22:
+    Retorna a instância do gerenciador de conexão sem recriá-la na memória.
+    """
+    try:
+        return st.connection("postgresql", type="sql")
+    except Exception:
+        return None
+
+
 with tab_teoria:
-    st.subheader("Arquitetura e Recursos Avançados Utilizados")
-    col_a, col_b = st.columns(2)
-    with col_a:
+    st.subheader("🎓 Laboratório Pedagógico & Conceitos das Aulas")
+    st.markdown("Esta seção reúne os exercícios conceituais e práticas guiadas apresentadas nos slides da Semana 11.")
+
+    # --------------------------------------------------------------------------
+    # PRÁTICA GUIADA DA AULA 1: CONSULTA SQL PARAMETRIZADA (Slide 15)
+    # --------------------------------------------------------------------------
+    st.markdown("---")
+    st.markdown("### 🔬 Prática Guiada da Aula 1: Consulta SQL Parametrizada (`params`)")
+    st.info(
+        "**Objetivo do Slide 15:** Construir uma consulta onde o usuário seleciona um parâmetro na tela "
+        "e a query SQL é executada trazendo apenas o recorte filtrado usando parâmetros seguros (`:param`), "
+        "prevenindo ataques de SQL Injection."
+    )
+
+    col_p1, col_p2 = st.columns([1, 2])
+    with col_p1:
+        ticker_param = st.selectbox(
+            "Selecione um Ativo para a Query:",
+            options=todos_tickers,
+            index=0,
+            key="param_ticker_aula1"
+        )
+        limite_linhas = st.slider("Qtd. Registros (LIMIT):", min_value=5, max_value=30, value=10, step=5)
+        executar_query = st.button("🚀 Executar Query SQL Parametrizada", use_container_width=True)
+
+    with col_p2:
+        sql_exemplo = f"""-- Sintaxe exata ensinada no Slide 15:
+conn = st.connection("postgresql", type="sql")
+query = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 WHERE ticker = :ticker ORDER BY data DESC LIMIT :limite;"
+df = conn.query(query, params={{"ticker": "{ticker_param}", "limite": {limite_linhas}}})"""
+        st.code(sql_exemplo, language="python")
+
+    if executar_query:
+        with st.spinner("Executando query SQL parametrizada no banco..."):
+            try:
+                conn_direta = obter_conexao_persistente()
+                if conn_direta is not None and "Supabase" in origem_dados:
+                    query_sql = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 WHERE ticker = :ticker ORDER BY data DESC LIMIT :limite;"
+                    df_resultado_param = conn_direta.query(query_sql, params={"ticker": ticker_param, "limite": limite_linhas}, ttl=0)
+                    st.success(f"Query SQL executada com sucesso no Supabase! Retornados {len(df_resultado_param)} registros.")
+                else:
+                    # Simulação pedagógica de fallback
+                    df_resultado_param = df_bruto[df_bruto["ticker"] == ticker_param].sort_values(by="data", ascending=False).head(limite_linhas)
+                    st.info(f"Executado em modo Fallback Local para o ticker **{ticker_param}** ({len(df_resultado_param)} registros).")
+
+                st.dataframe(
+                    df_resultado_param,
+                    column_config={
+                        "data": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
+                        "preco_fechamento": st.column_config.NumberColumn("Preço Fechamento", format="R$ %.2f"),
+                        "volume": st.column_config.NumberColumn("Volume", format="%d"),
+                        "ticker": st.column_config.TextColumn("Ticker")
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
+            except Exception as erro_exec:
+                st.error(f"Erro ao executar query parametrizada: {erro_exec}")
+
+    # --------------------------------------------------------------------------
+    # COMPARATIVO DA AULA 2: @st.cache_data vs @st.cache_resource (Slide 22 e 23)
+    # --------------------------------------------------------------------------
+    st.markdown("---")
+    st.markdown("### ⚡ Comparativo da Aula 2: `@st.cache_data` vs `@st.cache_resource` (Slide 23)")
+    
+    col_cd, col_cr = st.columns(2)
+    with col_cd:
         st.markdown("""
-        #### 1. Conexão & Resiliência
-        * **`st.connection("postgresql", type="sql")`**: Conexão nativa e gerenciamento automático de conexões SQLAlchemy com o Supabase.
-        * **Fallback com `try/except`**: Se o Supabase estiver indisponível ou as credenciais não existirem, o app reverte para o arquivo local `dados_b3_reais.csv`.
-        * **Segurança**: Isolamento de credenciais no `.streamlit/secrets.toml` com bloqueio no `.gitignore`.
+        #### 📦 `@st.cache_data` (Dados e Tabelas)
+        * **Destino:** DataFrames do Pandas, consultas SQL, listas, tabelas e retornos de APIs.
+        * **Comportamento:** Cria e retorna uma **cópia segura** dos dados a cada execução, prevenindo mutações indesejadas.
+        * **Exemplo no nosso código:**
+        ```python
+        @st.cache_data(ttl=600)
+        def _consultar_supabase():
+            return conn.query("SELECT ...")
+        ```
         """)
-    with col_b:
+    with col_cr:
         st.markdown("""
-        #### 2. Caching & Performance
-        * **`@st.cache_data(ttl=600)`**: Evita bater no banco de dados a cada clique do usuário. A consulta é reaproveitada da memória do servidor por 10 minutos.
-        * **`st.session_state` e Callbacks**: Preserva as escolhas dos filtros no navegador e permite resetar parâmetros via `on_click=resetar_filtros`.
-        * **Visualização Dinâmica**: Gráficos reativos gerados com **Plotly Express** integrados ao tema visual da aplicação.
+        #### 🔌 `@st.cache_resource` (Conexões Globais)
+        * **Destino:** Conexões de Banco de Dados, Sessões de SQLAlchemy e Modelos de Machine Learning.
+        * **Comportamento:** Mantém e compartilha **exatamente a mesma instância** do objeto em memória para todas as sessões.
+        * **Exemplo no nosso código:**
+        ```python
+        @st.cache_resource
+        def obter_conexao_persistente():
+            return st.connection("postgresql", type="sql")
+        ```
         """)
+
+    # --------------------------------------------------------------------------
+    # RESUMO DA AULA 3: CHECKLIST DE DEPLOY EM PRODUÇÃO (Slide 39)
+    # --------------------------------------------------------------------------
+    st.markdown("---")
+    st.markdown("### ☁️ Checklist da Aula 3: Requisitos do Desafio Final (Slide 39)")
+    st.markdown("""
+    1. ✅ **Conexão Resiliente:** PostgreSQL na nuvem (Supabase) com fallback automático para CSV local.
+    2. ✅ **Painel com Filtros Cruzados:** Barra lateral (`st.sidebar`) com seleção múltipla, período de datas e escala.
+    3. ✅ **Performance & Cache:** Consultas protegidas com `@st.cache_data(ttl=600)` e estado com `st.session_state`.
+    4. ✅ **Visualizações Interativas:** Gráficos em Plotly (Cotação Histórica, Base 100 e Volume) e KPIs em colunas (`st.metric`).
+    5. ✅ **Deploy em Produção:** Repositório no GitHub integrado ao Streamlit Community Cloud com Secrets gerenciadas na nuvem.
+    """)
