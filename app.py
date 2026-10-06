@@ -19,11 +19,12 @@ st.set_page_config(
     page_title="Dashboard Financeiro B3 | Análise Avançada",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Estilização CSS refinada (Dark Mode Premium)
-st.markdown("""
+st.markdown(
+    """
 <style>
     /* Estilização dos cartões de métrica */
     div[data-testid="stMetric"] {
@@ -64,7 +65,9 @@ st.markdown("""
         display: inline-block;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 # ==============================================================================
@@ -76,6 +79,7 @@ st.markdown("""
 # 3. Resiliência de dados: fallback automático para CSV local caso a rede falhe
 # ==============================================================================
 
+
 @st.cache_data(ttl=600, show_spinner="Consultando dados de mercado no Supabase...")
 def _consultar_supabase():
     """
@@ -84,17 +88,24 @@ def _consultar_supabase():
     Se houver erro, a exceção é disparada e o Streamlit NÃO armazena o erro em cache!
     """
     conn = st.connection("postgresql", type="sql")
-    query = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 ORDER BY data ASC;"
+    query = (
+        "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 ORDER BY data ASC;"
+    )
     df = conn.query(query, ttl=600)
-    
+
     if df is None or df.empty:
         raise ValueError("A consulta ao banco Supabase retornou vazia.")
-        
+
     df["data"] = pd.to_datetime(df["data"]).dt.date
     df["preco_fechamento"] = pd.to_numeric(df["preco_fechamento"], errors="coerce")
     df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
-    df = df.dropna(subset=["preco_fechamento", "data"]).sort_values(by=["ticker", "data"]).reset_index(drop=True)
+    df = (
+        df.dropna(subset=["preco_fechamento", "data"])
+        .sort_values(by=["ticker", "data"])
+        .reset_index(drop=True)
+    )
     return df
+
 
 def carregar_dados():
     """
@@ -107,9 +118,15 @@ def carregar_dados():
     except Exception as erro:
         df_local = pd.read_csv(CAMINHO_CSV)
         df_local["data"] = pd.to_datetime(df_local["data"]).dt.date
-        df_local["preco_fechamento"] = pd.to_numeric(df_local["preco_fechamento"], errors="coerce")
+        df_local["preco_fechamento"] = pd.to_numeric(
+            df_local["preco_fechamento"], errors="coerce"
+        )
         df_local["volume"] = pd.to_numeric(df_local["volume"], errors="coerce")
-        df_local = df_local.dropna(subset=["preco_fechamento", "data"]).sort_values(by=["ticker", "data"]).reset_index(drop=True)
+        df_local = (
+            df_local.dropna(subset=["preco_fechamento", "data"])
+            .sort_values(by=["ticker", "data"])
+            .reset_index(drop=True)
+        )
         return df_local, "Fallback Local (dados_b3_reais.csv)", str(erro)
 
 
@@ -122,7 +139,9 @@ data_minima = df_bruto["data"].min()
 data_maxima = df_bruto["data"].max()
 
 # Seleção inicial inteligente: 4 blue chips conhecidas para evitar sobrecarga visual
-tickers_padrao_sugeridos = [t for t in ["PETR4", "VALE3", "ITUB4", "WEGE3"] if t in todos_tickers]
+tickers_padrao_sugeridos = [
+    t for t in ["PETR4", "VALE3", "ITUB4", "WEGE3"] if t in todos_tickers
+]
 if not tickers_padrao_sugeridos:
     tickers_padrao_sugeridos = todos_tickers[:4]
 
@@ -139,6 +158,7 @@ data_inicio_padrao = max(data_minima, data_maxima - timedelta(days=365 * 3))
 # 3. Construção de filtros reativos cruzados na barra lateral (st.sidebar)
 # ==============================================================================
 
+
 @st.cache_resource
 def obter_conexao_persistente():
     """
@@ -150,12 +170,14 @@ def obter_conexao_persistente():
     except Exception:
         return None
 
+
 # Inicialização segura do estado da sessão (Session State)
 if "filtro_tickers" not in st.session_state:
     st.session_state.filtro_tickers = tickers_padrao_sugeridos
 
 if "filtro_periodo" not in st.session_state:
     st.session_state.filtro_periodo = (data_inicio_padrao, data_maxima)
+
 
 def resetar_filtros():
     """Callback disparado pelo botão para restaurar os filtros ao estado padrão limpo"""
@@ -168,13 +190,19 @@ def resetar_filtros():
 # ------------------------------------------------------------------------------
 with st.sidebar:
     st.title("⚙️ Filtros do Mercado")
-    
+
     # Status da conexão
     if "Supabase" in origem_dados:
-        st.markdown(f'<span class="badge-cloud">🟢 {origem_dados}</span>', unsafe_allow_html=True)
+        st.markdown(
+            f'<span class="badge-cloud">🟢 {origem_dados}</span>',
+            unsafe_allow_html=True,
+        )
         st.caption("Conectado ao vivo com o banco PostgreSQL no Supabase.")
     else:
-        st.markdown(f'<span class="badge-fallback">🟡 {origem_dados}</span>', unsafe_allow_html=True)
+        st.markdown(
+            f'<span class="badge-fallback">🟡 {origem_dados}</span>',
+            unsafe_allow_html=True,
+        )
         if erro_conexao:
             with st.expander("🔍 Motivo do Fallback (Diagnóstico):", expanded=True):
                 st.caption("Erro retornado ao tentar conectar no Supabase:")
@@ -182,43 +210,45 @@ with st.sidebar:
         st.caption("Configure as credenciais no secrets.toml ou no painel da nuvem.")
 
     st.markdown("---")
-    
+
     # Filtro 1: Seleção de Ativos
     tickers_selecionados = st.multiselect(
         "Selecione os Ativos (Tickers):",
         options=todos_tickers,
         key="filtro_tickers",
-        help="Dica: selecione de 1 a 5 ativos para uma visualização gráfica mais limpa."
+        help="Dica: selecione de 1 a 5 ativos para uma visualização gráfica mais limpa.",
     )
-    
+
     # Filtro 2: Período de Análise
     periodo_selecionado = st.date_input(
         "Período de Análise:",
         min_value=data_minima,
         max_value=data_maxima,
         key="filtro_periodo",
-        help="Selecione a data de início e fim."
+        help="Selecione a data de início e fim.",
     )
-    
+
     st.markdown("### 🎛️ Visualização do Gráfico")
-    
+
     # Filtro 3: Normalização Base 100
     modo_comparativo = st.toggle(
         "Comparar Retorno (Base 100)",
         value=False,
-        help="Converte a cotação inicial de cada ação para 100 e compara a rentabilidade acumulada percentual."
+        help="Converte a cotação inicial de cada ação para 100 e compara a rentabilidade acumulada percentual.",
     )
-    
+
     # Filtro 4: Escala Logarítmica
     escala_log = st.toggle(
         "Escala Logarítmica (Eixo Y)",
         value=False,
-        help="Útil para visualizar ações com preços muito diferentes (ex: R$ 5 vs R$ 10.000) sem distorcer o gráfico."
+        help="Útil para visualizar ações com preços muito diferentes (ex: R$ 5 vs R$ 10.000) sem distorcer o gráfico.",
     )
-    
+
     st.markdown("---")
-    st.button("🔄 Restaurar Padrão Limpo", on_click=resetar_filtros, use_container_width=True)
-    
+    st.button(
+        "🔄 Restaurar Padrão Limpo", on_click=resetar_filtros, use_container_width=True
+    )
+
     st.markdown("---")
     st.caption("FIESC / SENAI • Visualização de Dados e BI\nM2S11 - Streamlit Avançado")
 
@@ -227,7 +257,9 @@ with st.sidebar:
 # APLICAÇÃO DOS FILTROS CRUZADOS NO DATAFRAME
 # ==============================================================================
 if not tickers_selecionados:
-    st.warning("⚠️ Selecione pelo menos um ticker na barra lateral para visualizar o dashboard.")
+    st.warning(
+        "⚠️ Selecione pelo menos um ticker na barra lateral para visualizar o dashboard."
+    )
     st.stop()
 
 # Validação do intervalo de datas
@@ -241,13 +273,15 @@ else:
 
 # Filtragem encadeada
 df_filtrado = df_bruto[
-    (df_bruto["ticker"].isin(tickers_selecionados)) &
-    (df_bruto["data"] >= d_inicio) &
-    (df_bruto["data"] <= d_fim)
+    (df_bruto["ticker"].isin(tickers_selecionados))
+    & (df_bruto["data"] >= d_inicio)
+    & (df_bruto["data"] <= d_fim)
 ].copy()
 
 if df_filtrado.empty:
-    st.info("Nenhum dado encontrado para o período selecionado. Tente expandir o intervalo de datas.")
+    st.info(
+        "Nenhum dado encontrado para o período selecionado. Tente expandir o intervalo de datas."
+    )
     st.stop()
 
 
@@ -300,41 +334,63 @@ st.markdown("---")
 # ==============================================================================
 # ABAS DE VISUALIZAÇÃO INTERATIVA
 # ==============================================================================
-tab_graficos, tab_tabela, tab_teoria = st.tabs([
-    "📈 Análise Gráfica Interativa",
-    "📋 Tabela de Dados & Exportação",
-    "🎓 Conceitos Pedagógicos da Aula"
-])
+tab_graficos, tab_tabela, tab_teoria = st.tabs(
+    [
+        "📈 Análise Gráfica Interativa",
+        "📋 Tabela de Dados & Exportação",
+        "🎓 Conceitos Pedagógicos da Aula",
+    ]
+)
 
 # Paleta de cores moderna e distinta
-PALETA_CORES = ["#10B981", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#84CC16"]
+PALETA_CORES = [
+    "#10B981",
+    "#3B82F6",
+    "#F59E0B",
+    "#EF4444",
+    "#8B5CF6",
+    "#EC4899",
+    "#06B6D4",
+    "#84CC16",
+]
 
 with tab_graficos:
     # 1. GRÁFICO PRINCIPAL DE PREÇOS
     if modo_comparativo:
         st.markdown("### 🚀 Rentabilidade Relativa Normalizada (Base 100)")
-        st.caption("Cada ativo inicia em 100 na primeira data do período. Valores acima de 100 indicam ganho percentual.")
-        
+        st.caption(
+            "Cada ativo inicia em 100 na primeira data do período. Valores acima de 100 indicam ganho percentual."
+        )
+
         # Cria cópia ordenada para cálculo da base 100
         df_norm = df_filtrado.sort_values(by=["ticker", "data"]).copy()
         df_norm["base_100"] = df_norm.groupby("ticker")["preco_fechamento"].transform(
             lambda x: (x / x.iloc[0]) * 100 if x.iloc[0] > 0 else 100
         )
-        
+
         fig_preco = px.line(
             df_norm,
             x="data",
             y="base_100",
             color="ticker",
             color_discrete_sequence=PALETA_CORES,
-            labels={"base_100": "Desempenho (Base 100)", "data": "Data", "ticker": "Ativo"}
+            labels={
+                "base_100": "Desempenho (Base 100)",
+                "data": "Data",
+                "ticker": "Ativo",
+            },
         )
-        fig_preco.add_hline(y=100, line_dash="dash", line_color="#9CA3AF", annotation_text="Ponto de Entrada (100)")
+        fig_preco.add_hline(
+            y=100,
+            line_dash="dash",
+            line_color="#9CA3AF",
+            annotation_text="Ponto de Entrada (100)",
+        )
         fig_preco.update_traces(
             hovertemplate="<b>%{fullData.name}</b><br>Data: %{x|%d/%m/%Y}<br>Desempenho: %{y:.2f} pts<extra></extra>",
-            line=dict(width=2.5)
+            line=dict(width=2.5),
         )
-        
+
     else:
         st.markdown("### 💰 Histórico do Preço de Fechamento (R$)")
         fig_preco = px.line(
@@ -344,11 +400,15 @@ with tab_graficos:
             color="ticker",
             color_discrete_sequence=PALETA_CORES,
             log_y=escala_log,
-            labels={"preco_fechamento": "Cotação (R$)", "data": "Data", "ticker": "Ativo"}
+            labels={
+                "preco_fechamento": "Cotação (R$)",
+                "data": "Data",
+                "ticker": "Ativo",
+            },
         )
         fig_preco.update_traces(
             hovertemplate="<b>%{fullData.name}</b><br>Data: %{x|%d/%m/%Y}<br>Cotação: R$ %{y:,.2f}<extra></extra>",
-            line=dict(width=2.5)
+            line=dict(width=2.5),
         )
 
     # Layout elegante: Legenda no topo sem sobreposição, grid suave
@@ -366,18 +426,10 @@ with tab_graficos:
             xanchor="center",
             x=0.5,
             title=None,
-            font=dict(size=12)
+            font=dict(size=12),
         ),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="#1F2937",
-            title=None
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor="#1F2937",
-            title=None
-        )
+        xaxis=dict(showgrid=True, gridcolor="#1F2937", title=None),
+        yaxis=dict(showgrid=True, gridcolor="#1F2937", title=None),
     )
     st.plotly_chart(fig_preco, use_container_width=True)
 
@@ -390,7 +442,7 @@ with tab_graficos:
         color="ticker",
         color_discrete_sequence=PALETA_CORES,
         barmode="group",
-        labels={"volume": "Volume de Ações", "data": "Data", "ticker": "Ativo"}
+        labels={"volume": "Volume de Ações", "data": "Data", "ticker": "Ativo"},
     )
     fig_vol.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>Data: %{x|%d/%m/%Y}<br>Volume: %{y:,.0f}<extra></extra>"
@@ -407,10 +459,10 @@ with tab_graficos:
             y=1.02,
             xanchor="center",
             x=0.5,
-            title=None
+            title=None,
         ),
         xaxis=dict(showgrid=True, gridcolor="#1F2937", title=None),
-        yaxis=dict(showgrid=True, gridcolor="#1F2937", title=None)
+        yaxis=dict(showgrid=True, gridcolor="#1F2937", title=None),
     )
     st.plotly_chart(fig_vol, use_container_width=True)
 
@@ -418,27 +470,29 @@ with tab_graficos:
 with tab_tabela:
     st.subheader("Base de Cotações Filtrada")
     st.markdown("Consulte e baixe os dados resultantes dos filtros aplicados.")
-    
+
     st.dataframe(
         df_filtrado,
         column_config={
             "data": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
-            "preco_fechamento": st.column_config.NumberColumn("Preço Fechamento", format="R$ %.2f"),
+            "preco_fechamento": st.column_config.NumberColumn(
+                "Preço Fechamento", format="R$ %.2f"
+            ),
             "volume": st.column_config.NumberColumn("Volume Negociado", format="%d"),
-            "ticker": st.column_config.TextColumn("Ativo (Ticker)")
+            "ticker": st.column_config.TextColumn("Ativo (Ticker)"),
         },
         use_container_width=True,
         hide_index=True,
-        height=420
+        height=420,
     )
-    
+
     csv_bytes = df_filtrado.to_csv(index=False).encode("utf-8")
     st.download_button(
         label="📥 Baixar Dados Filtrados em CSV",
         data=csv_bytes,
         file_name=f"cotacoes_b3_filtradas_{date.today()}.csv",
         mime="text/csv",
-        use_container_width=True
+        use_container_width=True,
     )
 
 
@@ -449,70 +503,150 @@ with tab_tabela:
 
 with tab_teoria:
     st.subheader("🎓 Laboratório Pedagógico & Conceitos das Aulas")
-    st.markdown("Esta seção reúne os exercícios conceituais e práticas guiadas apresentadas nos slides da Semana 11.")
+    st.markdown(
+        "Esta seção reúne os exercícios conceituais e práticas guiadas apresentadas nos slides da Semana 11."
+    )
 
     # --------------------------------------------------------------------------
     # PRÁTICA GUIADA DA AULA 1: CONSULTA SQL PARAMETRIZADA (Slide 15)
     # --------------------------------------------------------------------------
     st.markdown("---")
-    st.markdown("### 🔬 Prática Guiada da Aula 1: Consulta SQL Parametrizada (`params`)")
+    st.markdown(
+        "### 🔬 Prática Guiada da Aula 1: Consulta SQL Parametrizada (`params`)"
+    )
     st.info(
         "**Objetivo do Slide 15:** Construir uma consulta onde o usuário seleciona um parâmetro na tela "
         "e a query SQL é executada trazendo apenas o recorte filtrado usando parâmetros seguros (`:param`), "
         "prevenindo ataques de SQL Injection."
     )
 
+    # Passo 1: Organização visual em 2 colunas
+    # Coluna 1 (esquerda, proporção 1): Controles interativos (inputs do usuário)
+    # Coluna 2 (direita, proporção 2): Código SQL/Python gerado dinamicamente para os alunos verem
     col_p1, col_p2 = st.columns([1, 2])
+    
     with col_p1:
+        # Widget 1: Selectbox para o aluno escolher o ativo (ticker)
+        # key única garante que o widget não colida com os filtros da barra lateral
         ticker_param = st.selectbox(
             "Selecione um Ativo para a Query:",
             options=todos_tickers,
             index=0,
-            key="param_ticker_aula1"
+            key="param_ticker_aula1",
+            help="Este valor será injetado com segurança no parâmetro :ticker do SQL."
         )
-        limite_linhas = st.slider("Qtd. Registros (LIMIT):", min_value=5, max_value=30, value=10, step=5)
-        executar_query = st.button("🚀 Executar Query SQL Parametrizada", use_container_width=True)
+        
+        # Widget 2: Slider numérico para limitar a quantidade de registros retornados (LIMIT)
+        limite_linhas = st.slider(
+            "Qtd. Registros (LIMIT):", 
+            min_value=5, 
+            max_value=30, 
+            value=10, 
+            step=5,
+            help="Define o teto de linhas na cláusula LIMIT :limite da query."
+        )
+        
+        # Widget 3: Botão de ação explícita
+        # O botão impede que uma query pesada seja disparada antes do usuário terminar de escolher
+        executar_query = st.button(
+            "🚀 Executar Query SQL Parametrizada", 
+            use_container_width=True
+        )
 
     with col_p2:
-        sql_exemplo = f"""-- Sintaxe exata ensinada no Slide 15:
-                        conn = st.connection("postgresql", type="sql")
-                        query = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 WHERE ticker = :ticker ORDER BY data DESC LIMIT :limite;"
-                        df = conn.query(query, params={{"ticker": "{ticker_param}", "limite": {limite_linhas}}})"""
+        # Exibição pedagógica do código Python exato que roda nos bastidores
+        # Notem os marcadores :ticker e :limite -> eles NUNCA usam concatenação de strings com f-string!
+        sql_exemplo = f"""# 1. Abre o conector nativo do Streamlit gerenciando a conexão
+conn = st.connection("postgresql", type="sql")
+
+# 2. Define a query com parâmetros de substituição seguros (:ticker e :limite)
+#    IMPORTANTE: Nunca use f-strings com SQL direto (ex: "WHERE ticker = '{ticker_param}'")
+#    Concatenação direta abre vulnerabilidade para ataques de SQL Injection!
+query = \"\"\"
+    SELECT data, preco_fechamento, volume, ticker 
+    FROM acoes_b3 
+    WHERE ticker = :ticker 
+    ORDER BY data DESC 
+    LIMIT :limite;
+\"\"\"
+
+# 3. Executa a query passando os valores mapeados no dicionário 'params'
+#    O conector sanitiza e trata os tipos (string, int) automaticamente:
+df = conn.query(
+    query, 
+    params={{"ticker": "{ticker_param}", "limite": {limite_linhas}}},
+    ttl=0  # ttl=0 garante que a consulta ao vivo não use cache antigo no teste
+)"""
         st.code(sql_exemplo, language="python")
 
+    # Passo 2: Execução condicional disparada apenas quando o botão for clicado
     if executar_query:
+        # st.spinner exibe um feedback visual de carregamento enquanto o banco processa
         with st.spinner("Executando query SQL parametrizada no banco..."):
             try:
-                conn_direta = obter_conexao_persistente()
-                if conn_direta is not None and "Supabase" in origem_dados:
-                    query_sql = "SELECT data, preco_fechamento, volume, ticker FROM acoes_b3 WHERE ticker = :ticker ORDER BY data DESC LIMIT :limite;"
-                    df_resultado_param = conn_direta.query(query_sql, params={"ticker": ticker_param, "limite": limite_linhas}, ttl=0)
-                    st.success(f"Query SQL executada com sucesso no Supabase! Retornados {len(df_resultado_param)} registros.")
+                # Obtém a conexão ativa do Streamlit
+                conn = st.connection("postgresql", type="sql")
+                
+                # Se estamos conectados ao vivo no Supabase, roda a query diretamente no banco na nuvem
+                if conn is not None and "Supabase" in origem_dados:
+                    query_sql = (
+                        "SELECT data, preco_fechamento, volume, ticker "
+                        "FROM acoes_b3 "
+                        "WHERE ticker = :ticker "
+                        "ORDER BY data DESC "
+                        "LIMIT :limite;"
+                    )
+                    
+                    # conn.query() executa com os parâmetros fornecidos e retorna um DataFrame do Pandas
+                    df_resultado_param = conn.query(
+                        query_sql,
+                        params={"ticker": ticker_param, "limite": limite_linhas},
+                        ttl=0,  # ttl=0 força a consulta em tempo real sem reaproveitar cache
+                    )
+                    st.success(
+                        f"Query SQL executada com sucesso no Supabase! Retornados {len(df_resultado_param)} registros."
+                    )
                 else:
-                    # Simulação pedagógica de fallback
-                    df_resultado_param = df_bruto[df_bruto["ticker"] == ticker_param].sort_values(by="data", ascending=False).head(limite_linhas)
-                    st.info(f"Executado em modo Fallback Local para o ticker **{ticker_param}** ({len(df_resultado_param)} registros).")
+                    # Mecanismo de Fallback Pedagógico:
+                    # Se o banco remoto estiver inacessível, simula a mesma query filtrando o CSV em memória
+                    df_resultado_param = (
+                        df_bruto[df_bruto["ticker"] == ticker_param]
+                        .sort_values(by="data", ascending=False)
+                        .head(limite_linhas)
+                    )
+                    st.info(
+                        f"Executado em modo Fallback Local para o ticker **{ticker_param}** ({len(df_resultado_param)} registros)."
+                    )
 
+                # Passo 3: Apresentação tabular dos dados retornados
+                # Usamos column_config para formatar datas e moedas no padrão visual corporativo
                 st.dataframe(
                     df_resultado_param,
                     column_config={
-                        "data": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
-                        "preco_fechamento": st.column_config.NumberColumn("Preço Fechamento", format="R$ %.2f"),
+                        "data": st.column_config.DateColumn(
+                            "Data", format="DD/MM/YYYY"
+                        ),
+                        "preco_fechamento": st.column_config.NumberColumn(
+                            "Preço Fechamento", format="R$ %.2f"
+                        ),
                         "volume": st.column_config.NumberColumn("Volume", format="%d"),
-                        "ticker": st.column_config.TextColumn("Ticker")
+                        "ticker": st.column_config.TextColumn("Ticker"),
                     },
                     use_container_width=True,
-                    hide_index=True
+                    hide_index=True,
                 )
             except Exception as erro_exec:
+                # Tratamento de exceção amigável: mostra o erro sem quebrar a aplicação do aluno
                 st.error(f"Erro ao executar query parametrizada: {erro_exec}")
 
     # --------------------------------------------------------------------------
     # COMPARATIVO DA AULA 2: @st.cache_data vs @st.cache_resource (Slide 22 e 23)
     # --------------------------------------------------------------------------
     st.markdown("---")
-    st.markdown("### ⚡ Comparativo da Aula 2: `@st.cache_data` vs `@st.cache_resource` (Slide 23)")
-    
+    st.markdown(
+        "### ⚡ Comparativo da Aula 2: `@st.cache_data` vs `@st.cache_resource` (Slide 23)"
+    )
+
     col_cd, col_cr = st.columns(2)
     with col_cd:
         st.markdown("""
